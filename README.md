@@ -72,6 +72,33 @@ model = train_rf(X, y, "models/random_forest.pkl")
 
 Baseline models for Random Forest and XGBoost regression are implemented and can be trained in a similar manner.
 
+## Deep Learning Models
+
+In addition to the classical ML models, feed-forward neural networks (FFNNs) were trained using combined molecule and protein features (1450 dimensions). Three variants were implemented:
+
+1. **FFNN Simple (`ffnn_egfr_simple.pth`)**  
+   - 3 layers: 1450 → 512 → 128 → 1  
+   - ReLU activations, dropout 0.2  
+   - Baseline deep learning model for comparison with classical ML
+
+2. **FFNN Deep (`ffnn_egfr_deep.pth`)**  
+   - 4 layers with batch normalization and dropout  
+   - Wider and deeper to capture more complex relationships
+
+3. **FFNN Wide (`ffnn_egfr_wide.pth`)**  
+   - Wider hidden layers: 1450 → 1024 → 512 → 256 → 1  
+   - ReLU activations, moderate dropout
+
+### Training and Usage
+
+```python
+from src.models.train_dl import train_model
+from src.models.ffnn import FFNN_Simple, FFNN_Deep, FFNN_Wide
+
+# Example: train the simple FFNN
+model = FFNN_Simple(input_dim=1450)
+train_model(model, name="ffnn_egfr_simple")
+
 ## Model Evaluation
 
 The models were evaluated in a variety of ways, including:
