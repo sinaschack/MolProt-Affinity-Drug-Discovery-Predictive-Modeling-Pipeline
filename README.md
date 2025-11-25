@@ -1,176 +1,203 @@
-# MolProt-Affinity-Drug-Discovery-Predictive-Modeling-Pipeline
-End-to-end drug discovery machine learning workflow in Python. Retrieves real ChEMBL bioactivity data, featurizes molecules and proteins, trains predictive models (Random Forest, XGBoost), and offers interpretability with SHAP.
+# MolProt-Affinity-Drug-Discovery-Predictive-Modeling-Pipeline 
 
-## Overview
+End-to-end predictive modeling workflow in Python for small molecule–protein binding affinity. Pulls real ChEMBL bioactivity data, featurizes molecules and proteins, trains predictive models (Random Forest, XGBoost, and Deep Learning), and offers basic interpretability with inline plots.
 
-This project walks through an end-to-end predictive modeling pipeline for small molecule–protein binding affinity, with EGFR used as a concrete example target. Key steps include:
+--- 
 
-* Data collection from ChEMBL in the form of canonical SMILES strings and IC50 bioactivity values
-* Molecular featurization with Morgan fingerprints and RDKit descriptors
-* Protein featurization with amino acid composition and k-mer counts
-* Building combined molecule–protein feature matrices as NumPy arrays
-* Fitting baseline ML models for regression (Random Forest, XGBoost)
-* Evaluating model performance and generalization (RMSE, R², cross-validation)
-* Providing interpretability with SHAP to understand model predictions
-* Visualizing molecular potency grids and distribution plots
+## Overview 
 
-## Installation
+The project guides through an end-to-end workflow for small molecule binding to a protein target. EGFR is used as an example target throughout the project.
 
-1. Clone the repository and enter the directory:
+The workflow includes: 
 
-```bash
-git clone <repo-url>
-cd MolProt-Affinity
-```
+* Fetching ChEMBL IC50 bioactivity data for a target protein
+* Data cleaning and exploration 
+* Molecular featurization: Morgan fingerprints and RDKit descriptors 
+* Protein featurization: amino acid composition and 2-mer counts
+* Creating a final feature matrix combining molecule and protein features
+* Training baseline machine learning models (Random Forest and XGBoost)
+* Training PyTorch feed-forward neural networks (FFNN) 
+* Inline visualization of pIC50 distributions and potency-colored molecule grids
 
-2. Create a virtual environment and activate it:
+--- 
 
-```bash
-python -m venv venv
-source venv/bin/activate # Linux/macOS
-venv\Scripts\activate # Windows
-```
+## Installation 
 
-3. Install required dependencies:
+1. Clone the repository and enter the directory: 
 
-```bash
-pip install -r requirements.txt
-```
+```bash 
+git clone <repo-url> 
+cd MolProt-Affinity 
+``` 
 
-## Usage
+2. Create a virtual environment and activate it: 
 
-### 1.
+```bash 
+python -m venv venv 
+source venv/bin/activate # Linux/macOS 
+venv\Scripts\activate # Windows 
+``` 
 
-Fetch ChEMBL bioactivity data for a given target (Chemical Identifier + path to save CSV file).
+3. Install the dependencies: 
 
-```python
-from src.chembl_fetch import fetch_chembl_data
+```bash 
+pip install -r requirements.txt 
+``` 
 
-df = fetch_chembl_data("CHEMBL203", "data/raw/chembl_egfr.csv")
-```
+--- 
 
-### 2.
+## Usage 
 
-Generate combined molecule and protein feature matrix with labels (input CSV file path + output pickle path).
+### 1. Fetch ChEMBL bioactivity data 
 
-```python
-from src.dataset import build_feature_matrix
+Fetch IC50 data for a given target (CHEMBL ID) and save it as CSV:
 
-X, y = build_feature_matrix("data/raw/chembl_egfr.csv", "data/pickle/egfr_combined.pkl")
-```
+```python 
+from src.chembl_fetch import fetch_chembl_data 
 
-### 3.
+df = fetch_chembl_data("CHEMBL203", "data/raw/chembl_egfr.csv") 
+``` 
 
-Train a predictive model on the preprocessed feature matrix.
+This function will return a DataFrame containing: 
 
-```python
-from src.train import train_rf
-import joblib
+* `smiles` — canonical SMILES string for the molecule 
+* `IC50_nM` — experimental IC50 
+* `pIC50` — converted target value (`pIC50 = 9 - log10(IC50_nM)`) 
 
-model = train_rf(X, y, "models/random_forest.pkl")
-```
+--- 
 
-Baseline models for Random Forest and XGBoost regression are implemented and can be trained in a similar manner.
+### 2. Data cleaning & exploration 
 
-## Deep Learning Models
+Drop duplicates and visualize pIC50 distribution. 
 
-In addition to the classical ML models, feed-forward neural networks (FFNNs) were trained using combined molecule and protein features (1450 dimensions). Three variants were implemented:
+```python 
+import pandas as pd 
+import seaborn as sns 
+import matplotlib.pyplot as plt 
 
-1. **FFNN Simple (`ffnn_egfr_simple.pth`)**  
-   - 3 layers: 1450 → 512 → 128 → 1  
-   - ReLU activations, dropout 0.2  
-   - Baseline deep learning model for comparison with classical ML
+df = pd.read_csv("data/raw/chembl_egfr.csv") 
+df = df.drop_duplicates(subset=["smiles"]) 
 
-2. **FFNN Deep (`ffnn_egfr_deep.pth`)**  
-   - 4 layers with batch normalization and dropout  
-   - Wider and deeper to capture more complex relationships
+# Histogram 
+sns.histplot(df["pIC50"], bins=30, kde=True) 
+plt.show() 
 
-3. **FFNN Wide (`ffnn_egfr_wide.pth`)**  
-   - Wider hidden layers: 1450 → 1024 → 512 → 256 → 1  
-   - ReLU activations, moderate dropout
+# Boxplot 
+sns.boxplot(x=df["pIC50"]) 
+plt.show() 
+``` 
 
-### Training and Usage
+Create a potency-colored molecule grid using RDKit. 
 
-```python
-from src.models.train_dl import train_model
-from src.models.ffnn import FFNN_Simple, FFNN_Deep, FFNN_Wide
+--- 
 
-# Example: train the simple FFNN
-model = FFNN_Simple(input_dim=1450)
-train_model(model, name="ffnn_egfr_simple")
+### 3. Feature Engineering 
 
-## Model Evaluation
+**Molecular features:** 
 
-The models were evaluated in a variety of ways, including:
-
-* Train/test split performance (RMSE, R²)
-* K-fold cross-validation with shuffling
-* Train/valid/test splits with cross-validation
-* Hyperparameter tuning (Randomized Search, Grid Search)
-
-Performance was measured using RMSE loss and R² coefficient of determination. Feature importance and SHAP values were also computed for interpretability.
-
-## Interpretability
-
-SHAP feature importance was calculated and visualized for the trained models using fitted feature importances and SHAP summary plots.
-
-```python
-from src.explain import explain_model
-
-explain_model(model, X_test, feature_names)
-```
-
-The importance of molecular features, protein features, and all features are visualized in HTML static reports.
-
-## Visualization
-
-Molecule grids colored by potency (IC50 values) and distribution plots were also generated to help understand the data.
-
-## Data and Features
-
-The following features are used to describe each molecule and its target protein. The raw data was sourced from the [ChEMBL database](https://www.ebi.ac.uk/chembl/) and downloaded using [chembl_webresource_client](https://github.com/chembl/chembl_webresource_client).
-
-### Molecular features
-
-Molecular features are extracted from the SMILES strings using RDKit:
-
-* Morgan fingerprints (1024-bit)
+* Morgan fingerprints (1024-bit) 
 * RDKit descriptors: MolWt, LogP, TPSA, HDonors, HAcceptors, RotBonds
 
-### Protein features
+**Protein features:** 
 
-Protein features are derived from the sequences of the target proteins:
+* Amino acid composition (20-dimensional) 
+* 2-mer composition (400-dimensional) 
 
-* Amino acid composition (20-dimensional)
-* 2-mer amino acid composition (400-dimensional)
+**Final feature matrix:** 
 
-### Combined feature matrix
+`X_final` = [Morgan + RDKit + Protein] → `(N_molecules, 1450 features)` 
 
-The final feature matrix (X) contains both molecular and protein features concatenated for each molecule–protein pair:
+It's a good idea to pickle preprocessed features for reproducibility.
 
-* Example shape for 365 EGFR-target molecules: (365, 1450) features per sample
+```python 
+import pickle 
+with open("data/pickle/egfr_combined.pkl", "wb") as f: 
+pickle.dump({ 
+"X_combined": X_final, 
+"y": y, 
+"smiles": df["smiles"].tolist() 
+}, f) 
+``` 
 
-The labels (y) are the continuous pIC50 values converted from the IC50 values.
+--- 
 
-## Results
+### 4. Baseline Machine Learning Models 
 
-### Model performance
+Train Random Forest and XGBoost regressors on the combined feature matrix.
 
-RMSE loss and R² coefficient of determination for the baseline models:
+```python 
+from sklearn.model_selection import train_test_split 
+from sklearn.ensemble import RandomForestRegressor 
+import xgboost as xgb 
+import joblib 
 
-* RF baseline: RMSE ~0.72
-* XGBoost baseline: RMSE ~0.83
+# Split 
+X_train, X_test, y_train, y_test = train_test_split(X_final, y, test_size=0.2, random_state=42)
 
-A higher R² value close to 1 indicates that the predicted pIC50 values are strongly correlated to the experimental values.
+# Random Forest 
+rf = RandomForestRegressor(n_estimators=600, n_jobs=-1, random_state=42) 
+rf.fit(X_train, y_train) 
+joblib.dump(rf, "models/random_forest.pkl") 
 
-### Visualization
+# XGBoost 
+xgb_model = xgb.XGBRegressor( 
+n_estimators=1000, learning_rate=0.05, max_depth=8, 
+subsample=0.8, colsample_bytree=0.8, random_state=42 
+) 
+xgb_model.fit(X_train, y_train) 
+joblib.dump(xgb_model, "models/xgboost.pkl") 
+``` 
 
-Potency-colored molecule grids and distribution plots were also generated to help understand the dataset.
+Evaluation (RMSE, R², etc.) can be done on `X_test` / `y_test`. 
 
-## References
+--- 
 
-* [ChEMBL Web Resource Client](https://github.com/chembl/chembl_webresource_client)
-* [RDKit](https://www.rdkit.org/)
-* [Scikit-learn](https://scikit-learn.org/)
-* [XGBoost](https://xgboost.readthedocs.io/)
-* [SHAP](https://github.com/slundberg/shap)
+### 5. Deep Learning Models (PyTorch) 
+
+Three feed-forward neural networks are implemented: 
+
+* `FFNN_Simple` – 2 hidden layers, ReLU + dropout 
+* `FFNN_Deep` – deeper network with BatchNorm, dropout 
+* `FFNN_Wide` – wider network with more neurons per layer
+
+**Training:** 
+
+```python 
+from src.deep_learning import FFNN_Simple, FFNN_Deep, FFNN_Wide, train_model 
+
+train_model(FFNN_Simple(input_dim=X_final.shape[1]), "ffnn_egfr_simple") 
+train_model(FFNN_Deep(input_dim=X_final.shape[1]), "ffnn_egfr_deep") 
+train_model(FFNN_Wide(input_dim=X_final.shape[1]), "ffnn_egfr_wide") 
+``` 
+
+Models will be automatically saved as `.pth` files in `models/` directory. Early stopping is used to avoid overfitting. 
+
+--- 
+
+## Visualization 
+
+* Histograms and boxplots of pIC50 values 
+* Potency-colored molecule grids (green = strong binder, red = weak binder)
+
+--- 
+
+## Data & Features 
+
+| Feature Type | Dimensions | Description | 
+| ---------------------- | ---------- | ------------------------------------------------ | 
+| Morgan fingerprints | 1024 | Circular fingerprints of molecules | 
+| RDKit descriptors | 6 | MolWt, LogP, TPSA, HDonors, HAcceptors, RotBonds |
+| Protein AA composition | 20 | Fraction of each amino acid |
+| Protein 2-mer | 400 | 2-mer counts normalized by sequence length |
+
+**Total features:** 1450 per molecule–protein pair. 
+
+--- 
+
+## References 
+
+* [ChEMBL Web Resource Client](https://github.com/chembl/chembl_webresource_client) 
+* [RDKit](https://www.rdkit.org/) 
+* [Scikit-learn](https://scikit-learn.org/) 
+* [XGBoost](https://xgboost.readthedocs.io/) 
+* [PyTorch](https://pytorch.org/) 
